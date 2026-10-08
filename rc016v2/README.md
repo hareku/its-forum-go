@@ -6,13 +6,21 @@ ITS FORUM RC-016 **2.0** の自転車・歩行者送信（B2I/P2I/B2V/P2V）を�
 
 ## 導入と検証
 
-**初回予定のバージョン付きリリース `v0.1.0` は未公開です。** 以下はRC-013と本モジュールのタグ公開後に、利用側のGoモジュールで実行します。
+初回バージョンは `v0.1.0` です。利用側のGoモジュールで次を実行します。
 
 ```sh
 go get github.com/hareku/its-forum-go/rc016v2@v0.1.0
 ```
 
-現在はリポジトリ全体をcheckoutし、ルートで `GOWORK=off go run ./scripts/verify-modules.go` を実行してください。空cache・一時file proxyによる独立配布検証であり、公開proxyからの取得の証明ではありません。未公開のRC-013に依存するため、単独ディレクトリでの通常の `GOWORK=off go test ./...` は依存を取得できません。
+このモジュールのディレクトリ内で、公開版のRC-013を使った単独の検証ができます。
+
+```sh
+GOWORK=off go test -mod=readonly -count=1 ./...
+GOWORK=off go vet -mod=readonly ./...
+GOWORK=off go mod verify
+```
+
+リポジトリ全体をcheckoutした場合は、ルートで `GOWORK=off go run ./scripts/verify-modules.go` を実行してください。空cache・一時file proxyによる独立配布検証であり、公開proxyからの取得の証明ではありません。
 
 ## 構築・読み取り・編集
 
@@ -96,6 +104,6 @@ ID `0x90` / `0x91` は例の実験値です。規格の既定IDでも、自動�
 
 ## 開発・ライセンス
 
-全体の開発・CI手順はリポジトリのルート `README.md`、版管理・公開順序は `docs/releasing.md` を参照してください。これらは個別ZIPには含まれないため、[リポジトリ](https://github.com/hareku/its-forum-go)でも参照できます。依存先RC-013公開後に `rc016v2/v0.1.0` を独立して公開する予定です。
+全体の開発・CI手順はリポジトリのルート `README.md`、版管理・公開順序は `docs/releasing.md` を参照してください。これらは個別ZIPには含まれないため、[リポジトリ](https://github.com/hareku/its-forum-go)でも参照できます。本モジュールは `rc016v2/v0.1.0` のような独立したGit tagで版管理します。
 
 [MIT License](LICENSE)。モジュール配布ZIPにルートと同一のLICENSEを含めます。

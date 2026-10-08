@@ -6,13 +6,21 @@ ITS FORUM RC-016 **1.0** の自転車・歩行者、通常路側機、CSMA型路
 
 ## 導入
 
-**初回予定のバージョン付きリリース `v0.1.0` は未公開です。** 次のコマンドはRC-013とRC-016のタグ公開後、利用側のGoモジュールで実行します。
+初回バージョンは `v0.1.0` です。利用側のGoモジュールで次を実行します。
 
 ```sh
 go get github.com/hareku/its-forum-go/rc016v1@v0.1.0
 ```
 
-現在の独立検証は、リポジトリ全体をcheckoutし、**リポジトリのルート**から `GOWORK=off go run ./scripts/verify-modules.go` を実行します。RC-013公開前は、RC-016ディレクトリで素の `GOWORK=off go test ./...` を実行しても依存を公開proxyから取得できません。runnerのローカル配布検証は実公開取得の証明ではありません。
+このモジュールのディレクトリ内で、公開版のRC-013を使った単独の検証ができます。
+
+```sh
+GOWORK=off go test -mod=readonly -count=1 ./...
+GOWORK=off go vet -mod=readonly ./...
+GOWORK=off go mod verify
+```
+
+リポジトリ全体をcheckoutした場合は、**リポジトリのルート**から `GOWORK=off go run ./scripts/verify-modules.go` で配布ZIP・外部consumerも検査できます。runnerのローカル配布検証は実公開取得の証明ではありません。
 
 ## 読み取り・編集・書き込み
 
