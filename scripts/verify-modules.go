@@ -1,4 +1,4 @@
-// Command verify-modules checks the two unpublished module candidates using an
+// Command verify-modules checks the three unpublished module candidates using an
 // isolated file proxy. Its synthetic checksums are never copied into source.
 // Run from the repository root: GOWORK=off go run ./scripts/verify-modules.go.
 package main
@@ -29,23 +29,31 @@ const (
 )
 
 type module struct {
-	name  string
-	files []string
+	name         string
+	consumer     string
+	dependencies []string
+	files        []string
 }
 
-// This inventory deliberately describes only the two current modules. Adding a
+// This inventory deliberately describes only the three current modules. Adding a
 // module or distribution file requires updating this list and its consumer.
 var modules = []module{
-	{"rc013v1", strings.Fields(`LICENSE README.md go.mod
+	{"rc013v1", "consumer-rc013", nil, strings.Fields(`LICENSE README.md go.mod
  common.go errors.go errors_test.go example_test.go frame_codec.go frames.go
  frames_test.go free.go message.go message_test.go validation.go values.go
  internal/bitio/bitio.go internal/bitio/bitio_test.go`)},
-	{"rc016v1", strings.Fields(`LICENSE README.md go.mod
+	{"rc016v1", "consumer-rc016", []string{moduleBase + "rc013v1"}, strings.Fields(`LICENSE README.md go.mod
  bicycle.go bicycle_fuzz_test.go bicycle_profiles.go bicycle_profiles_test.go bicycle_test.go
  csma.go csma_fuzz_test.go csma_test.go doc.go errors.go example_test.go
  roadside.go roadside_fuzz_test.go roadside_profiles.go roadside_profiles_test.go roadside_test.go
  internal/bitio/bitio.go internal/bitio/bitio_test.go
  testdata/bicycle.hex testdata/csma.hex testdata/personal-vectors.md`)},
+	{"rc016v2", "consumer-rc016v2", []string{moduleBase + "rc013v1"}, strings.Fields(`LICENSE README.md go.mod doc.go errors.go
+ frames.go payloads.go values.go validation.go profiles.go message.go message_validation.go
+ frames_test.go payloads_test.go validation_test.go message_test.go
+ message_validation_test.go message_fuzz_test.go example_test.go
+ internal/bitio/bitio.go internal/bitio/bitio_test.go
+ testdata/spec-vectors.md testdata/bicycle.hex testdata/pedestrian.hex`)},
 }
 
 type savedFile struct {
@@ -97,7 +105,7 @@ func run() (result error) {
 	if err := checkSource(root); err != nil {
 		return err
 	}
-	report("SOURCE_INVENTORY", "all", "PASS explicit module README, codec, test, internal and three testdata files")
+	report("SOURCE_INVENTORY", "all", "PASS explicit module README, codec, test, internal and applicable testdata files")
 	report("BITIO_PARITY", "all", "PASS implementation and tests are identical")
 	report("LICENSE_SOURCE", "all", "PASS explicit module copies match root MIT license")
 	temp, err := os.MkdirTemp("", "its-forum-verify-")
@@ -157,17 +165,14 @@ func run() (result error) {
 		if err := writeFiles(stage, inventories[m.name]); err != nil {
 			return err
 		}
-		label := "ISOLATED_" + strings.ToUpper(strings.TrimSuffix(m.name, "v1"))
+		label := "ISOLATED_" + strings.ToUpper(m.name)
 		if _, err := goCommand(stage, env, label, "test", "-mod=mod", "-count=1", "./..."); err != nil {
 			return err
 		}
 		if err := sameFile(filepath.Join(stage, "go.mod"), inventories[m.name]["go.mod"]); err != nil {
 			return err
 		}
-		dependencies := []string{}
-		if m.name == "rc016v1" {
-			dependencies = append(dependencies, moduleBase+"rc013v1")
-		}
+		dependencies := m.dependencies
 		if err := readonlyChecks(stage, env, cache, moduleBase+m.name, dependencies, label); err != nil {
 			return err
 		}
@@ -179,8 +184,8 @@ func run() (result error) {
 		}
 		report("ISOLATED_STAGE", moduleBase+m.name, "PASS completed source stage removed before next scenario")
 	}
-	for i, m := range modules {
-		name := []string{"consumer-rc013", "consumer-rc016"}[i]
+	for _, m := range modules {
+		name := m.consumer
 		stage := filepath.Join(temp, "consumers", name)
 		fixture, err := os.ReadFile(filepath.Join(root, "scripts", "testdata", name, "consumer_test.go"))
 		if err != nil {
@@ -197,9 +202,8 @@ func run() (result error) {
 		if _, err := goCommand(stage, env, label, "test", "-mod=mod", "-count=1", "./..."); err != nil {
 			return err
 		}
-		dependencies := []string{moduleBase + m.name}
-		if m.name == "rc016v1" {
-			dependencies = append(dependencies, moduleBase+"rc013v1")
+		dependencies := append([]string{moduleBase + m.name}, m.dependencies...)
+		if slices.Contains(m.dependencies, moduleBase+"rc013v1") {
 			resolved, err := goCommand(stage, env, label, "mod", "edit", "-json")
 			if err != nil {
 				return err
@@ -249,7 +253,11 @@ func checkStageAbsent(stage string) error {
 
 func snapshot(root string) (map[string]savedFile, error) {
 	out := make(map[string]savedFile)
-	for _, dir := range []string{"", "rc013v1", "rc016v1"} {
+	dirs := []string{""}
+	for _, m := range modules {
+		dirs = append(dirs, m.name)
+	}
+	for _, dir := range dirs {
 		for _, name := range []string{"go.mod", "go.sum", "go.work", "go.work.sum"} {
 			relative := filepath.Join(dir, name)
 			data, err := os.ReadFile(filepath.Join(root, relative))
@@ -270,7 +278,12 @@ func checkSource(root string) error {
 	if err != nil {
 		return fmt.Errorf("MODULE_METADATA: run from repository root: %w", err)
 	}
-	if strings.Join(strings.Fields(string(work)), " ") != "go "+goVersion+" use ( ./rc013v1 ./rc016v1 )" {
+	expectedWork := "go " + goVersion + " use ("
+	for _, m := range modules {
+		expectedWork += " ./" + m.name
+	}
+	expectedWork += " )"
+	if strings.Join(strings.Fields(string(work)), " ") != expectedWork {
 		return fmt.Errorf("MODULE_METADATA: unexpected go.work directives")
 	}
 	license, err := os.ReadFile(filepath.Join(root, "LICENSE"))
@@ -287,8 +300,8 @@ func checkSource(root string) error {
 			return err
 		}
 		expected := "module " + moduleBase + m.name + " go " + goVersion
-		if m.name == "rc016v1" {
-			expected += " require " + moduleBase + "rc013v1 " + version
+		for _, dependency := range m.dependencies {
+			expected += " require " + dependency + " " + version
 		}
 		if strings.Join(strings.Fields(string(files["go.mod"])), " ") != expected {
 			return fmt.Errorf("MODULE_METADATA: %s module path, Go version or dependency directives differ (replace is forbidden)", m.name)
@@ -302,12 +315,14 @@ func checkSource(root string) error {
 		if err != nil {
 			return err
 		}
-		second, err := os.ReadFile(filepath.Join(root, "rc016v1", "internal", "bitio", name))
-		if err != nil {
-			return err
-		}
-		if !bytes.Equal(first, second) {
-			return fmt.Errorf("BITIO_PARITY: %s differs", name)
+		for _, m := range modules[1:] {
+			other, err := os.ReadFile(filepath.Join(root, m.name, "internal", "bitio", name))
+			if err != nil {
+				return err
+			}
+			if !bytes.Equal(first, other) {
+				return fmt.Errorf("BITIO_PARITY: %s/%s differs", m.name, name)
+			}
 		}
 	}
 	return nil
@@ -567,46 +582,57 @@ func strictlyWithin(parent, child string) bool {
 }
 
 func negativeChecks(root, temp, proxy string, inventories map[string]map[string][]byte) error {
-	missingProxy := filepath.Join(temp, "missing-proxy")
-	if err := writeProxy(missingProxy, modules[1], inventories["rc016v1"]); err != nil {
-		return err
+	for _, m := range modules {
+		if len(m.dependencies) == 0 {
+			continue
+		}
+		missingProxy := filepath.Join(temp, "missing-proxy", m.name)
+		if err := writeProxy(missingProxy, m, inventories[m.name]); err != nil {
+			return err
+		}
+		env, _, err := isolatedEnv(filepath.Join(temp, "negative-missing-cache", m.name), missingProxy)
+		if err != nil {
+			return err
+		}
+		stage := filepath.Join(temp, "negative-missing-consumer", m.name)
+		fixture, err := os.ReadFile(filepath.Join(root, "scripts", "testdata", m.consumer, "consumer_test.go"))
+		if err != nil {
+			return err
+		}
+		mod := "module example.com/negative-missing\n\ngo " + goVersion + "\n\nrequire " + moduleBase + m.name + " " + version + "\n"
+		if err := writeFiles(stage, map[string][]byte{"go.mod": []byte(mod), "consumer_test.go": fixture}); err != nil {
+			return err
+		}
+		output, commandErr := goCommand(stage, env, "NEGATIVE_MISSING_DEPENDENCY", "test", "-mod=mod", "./...")
+		if commandErr == nil || !bytes.Contains(output, []byte(moduleBase+"rc013v1@"+version)) || !bytes.Contains(output, []byte("no such file or directory")) || !bytes.Contains(output, []byte("missing-proxy")) {
+			return fmt.Errorf("NEGATIVE_MISSING_DEPENDENCY: %s expected missing RC013 file-proxy error, got %v\n%s", m.name, commandErr, output)
+		}
+		report("NEGATIVE_MISSING_DEPENDENCY", m.name, "PASS expected missing dependency failure with fresh cache")
 	}
-	env, _, err := isolatedEnv(filepath.Join(temp, "negative-missing-cache"), missingProxy)
-	if err != nil {
-		return err
+	for _, owner := range modules {
+		env, _, err := isolatedEnv(filepath.Join(temp, "negative-internal-cache", owner.name), proxy)
+		if err != nil {
+			return err
+		}
+		stage := filepath.Join(temp, "negative-internal-consumer", owner.name)
+		mod := "module example.com/negative-internal\n\ngo " + goVersion + "\n\nrequire (\n"
+		for _, m := range modules {
+			mod += moduleBase + m.name + " " + version + "\n"
+		}
+		mod += ")\n"
+		illegal := "package consumer_test\nimport _ \"" + moduleBase + "rc016v2\"\nimport _ \"" + moduleBase + owner.name + "/internal/bitio\"\n"
+		if err := writeFiles(stage, map[string][]byte{"go.mod": []byte(mod), "consumer_test.go": []byte(illegal)}); err != nil {
+			return err
+		}
+		if _, err := goCommand(stage, env, "NEGATIVE_INTERNAL_IMPORT", "mod", "download", "all"); err != nil {
+			return err
+		}
+		output, commandErr := goCommand(stage, env, "NEGATIVE_INTERNAL_IMPORT", "test", "-mod=mod", "./...")
+		if commandErr == nil || !bytes.Contains(output, []byte("use of internal package "+moduleBase+owner.name+"/internal/bitio not allowed")) {
+			return fmt.Errorf("NEGATIVE_INTERNAL_IMPORT: expected internal visibility error, got %v\n%s", commandErr, output)
+		}
+		report("NEGATIVE_INTERNAL_IMPORT", owner.name, "PASS expected internal visibility failure after successful module download")
 	}
-	stage := filepath.Join(temp, "negative-missing-consumer")
-	fixture, err := os.ReadFile(filepath.Join(root, "scripts/testdata/consumer-rc016/consumer_test.go"))
-	if err != nil {
-		return err
-	}
-	mod := "module example.com/negative-missing\n\ngo " + goVersion + "\n\nrequire " + moduleBase + "rc016v1 " + version + "\n"
-	if err := writeFiles(stage, map[string][]byte{"go.mod": []byte(mod), "consumer_test.go": fixture}); err != nil {
-		return err
-	}
-	output, commandErr := goCommand(stage, env, "NEGATIVE_MISSING_DEPENDENCY", "test", "-mod=mod", "./...")
-	if commandErr == nil || !bytes.Contains(output, []byte(moduleBase+"rc013v1@"+version)) || !bytes.Contains(output, []byte("no such file or directory")) || !bytes.Contains(output, []byte("missing-proxy")) {
-		return fmt.Errorf("NEGATIVE_MISSING_DEPENDENCY: expected missing RC013 file-proxy error, got %v\n%s", commandErr, output)
-	}
-	report("NEGATIVE_MISSING_DEPENDENCY", moduleBase+"rc013v1", "PASS expected missing dependency failure with fresh cache")
-	env, _, err = isolatedEnv(filepath.Join(temp, "negative-internal-cache"), proxy)
-	if err != nil {
-		return err
-	}
-	stage = filepath.Join(temp, "negative-internal-consumer")
-	mod = "module example.com/negative-internal\n\ngo " + goVersion + "\n\nrequire (\n" + moduleBase + "rc013v1 " + version + "\n" + moduleBase + "rc016v1 " + version + "\n)\n"
-	illegal := "package consumer_test\nimport _ \"" + moduleBase + "rc013v1\"\nimport _ \"" + moduleBase + "rc016v1/internal/bitio\"\n"
-	if err := writeFiles(stage, map[string][]byte{"go.mod": []byte(mod), "consumer_test.go": []byte(illegal)}); err != nil {
-		return err
-	}
-	if _, err := goCommand(stage, env, "NEGATIVE_INTERNAL_IMPORT", "mod", "download", "all"); err != nil {
-		return err
-	}
-	output, commandErr = goCommand(stage, env, "NEGATIVE_INTERNAL_IMPORT", "test", "-mod=mod", "./...")
-	if commandErr == nil || !bytes.Contains(output, []byte("use of internal package "+moduleBase+"rc016v1/internal/bitio not allowed")) {
-		return fmt.Errorf("NEGATIVE_INTERNAL_IMPORT: expected internal visibility error, got %v\n%s", commandErr, output)
-	}
-	report("NEGATIVE_INTERNAL_IMPORT", moduleBase+"rc016v1", "PASS expected internal visibility failure after successful module download")
 	return mutationChecks(root, temp, inventories)
 }
 
@@ -630,17 +656,44 @@ func mutationChecks(root, temp string, inventories map[string]map[string][]byte)
 			return err
 		}
 	}
-	cases := []struct {
+	type mutationCase struct {
 		name, file, label string
 		data              []byte
-	}{
-		{"replace", "rc016v1/go.mod", "MODULE_METADATA", append(bytes.Clone(inventories["rc016v1"]["go.mod"]), []byte("\nreplace "+moduleBase+"rc013v1 => ../rc013v1\n")...)},
-		{"module-path", "rc013v1/go.mod", "MODULE_METADATA", []byte("module example.com/wrong\n\ngo " + goVersion + "\n")},
-		{"go-version", "rc013v1/go.mod", "MODULE_METADATA", []byte("module " + moduleBase + "rc013v1\n\ngo 1.26.0\n")},
-		{"bitio-source", "rc016v1/internal/bitio/bitio.go", "BITIO_PARITY", []byte("package bitio\n")},
-		{"bitio-tests", "rc016v1/internal/bitio/bitio_test.go", "BITIO_PARITY", []byte("package bitio\n")},
-		{"license", "rc013v1/LICENSE", "LICENSE_SOURCE", []byte("different license\n")},
 	}
+	var cases []mutationCase
+	for _, m := range modules {
+		original := inventories[m.name]["go.mod"]
+		for _, mutation := range []struct {
+			name string
+			data []byte
+		}{
+			{"replace", append(bytes.Clone(original), []byte("\nreplace "+moduleBase+"rc013v1 => ../rc013v1\n")...)},
+			{"module-path", bytes.ReplaceAll(original, []byte("module "+moduleBase+m.name), []byte("module example.com/wrong"))},
+			{"go-version", bytes.ReplaceAll(original, []byte("go "+goVersion), []byte("go 1.26.0"))},
+		} {
+			cases = append(cases, mutationCase{m.name + "-" + mutation.name, m.name + "/go.mod", "MODULE_METADATA", mutation.data})
+		}
+		if len(m.dependencies) > 0 {
+			for _, mutation := range []struct{ name, old, replacement string }{
+				{"missing-require", "require " + moduleBase + "rc013v1 " + version, ""},
+				{"wrong-require", moduleBase + "rc013v1", moduleBase + "rc016v1"},
+				{"require-version", version, "v0.2.0"},
+			} {
+				cases = append(cases, mutationCase{m.name + "-" + mutation.name, m.name + "/go.mod", "MODULE_METADATA", bytes.ReplaceAll(original, []byte(mutation.old), []byte(mutation.replacement))})
+			}
+		}
+		if m.name != "rc013v1" {
+			for _, name := range []string{"bitio.go", "bitio_test.go"} {
+				cases = append(cases, mutationCase{m.name + "-" + name, m.name + "/internal/bitio/" + name, "BITIO_PARITY", []byte("package bitio\n")})
+			}
+		}
+		cases = append(cases, mutationCase{m.name + "-license", m.name + "/LICENSE", "LICENSE_SOURCE", []byte("different license\n")})
+	}
+	workspace, err := os.ReadFile(filepath.Join(clone, "go.work"))
+	if err != nil {
+		return err
+	}
+	cases = append(cases, mutationCase{"workspace-v2-missing", "go.work", "MODULE_METADATA", bytes.ReplaceAll(workspace, []byte("./rc016v2"), nil)})
 	for _, c := range cases {
 		filename := filepath.Join(clone, filepath.FromSlash(c.file))
 		original, err := os.ReadFile(filename)
@@ -659,39 +712,66 @@ func mutationChecks(root, temp string, inventories map[string]map[string][]byte)
 		}
 		report("NEGATIVE_METADATA", c.name, "PASS expected "+c.label+" rejection in temporary clone")
 	}
-	// Exercise inventory and ZIP validators against temporary distribution damage.
-	missing := filepath.Join(clone, "rc016v1", "testdata", "csma.hex")
-	original, err := os.ReadFile(missing)
-	if err != nil {
-		return err
-	}
-	if err := os.Remove(missing); err != nil {
-		return err
-	}
-	detected := checkSource(clone)
-	if err := os.WriteFile(missing, original, 0600); err != nil {
-		return err
-	}
-	if detected == nil || !strings.Contains(detected.Error(), "SOURCE_INVENTORY") {
-		return fmt.Errorf("NEGATIVE_METADATA: missing testdata was not rejected: %v", detected)
-	}
-	report("NEGATIVE_METADATA", "testdata-inventory", "PASS expected SOURCE_INVENTORY rejection")
-	for _, name := range []string{"LICENSE", "internal/bitio/bitio.go", "README.md"} {
-		modified := make(map[string][]byte)
-		for file, data := range inventories["rc013v1"] {
-			modified[file] = data
+	// Exercise inventory and ZIP validators for every module in private clones.
+	for _, m := range modules {
+		dir := filepath.Join(clone, m.name)
+		for _, name := range m.files {
+			filename := filepath.Join(dir, filepath.FromSlash(name))
+			if err := os.Remove(filename); err != nil {
+				return err
+			}
+			detected := checkSource(clone)
+			if err := os.WriteFile(filename, inventories[m.name][name], 0600); err != nil {
+				return err
+			}
+			if detected == nil || !strings.Contains(detected.Error(), "SOURCE_INVENTORY") {
+				return fmt.Errorf("NEGATIVE_METADATA: missing %s/%s not rejected: %v", m.name, name, detected)
+			}
 		}
-		modified[name] = []byte("damaged temporary ZIP entry\n")
-		proxy := filepath.Join(temp, "mutation-proxy")
-		if err := writeProxy(proxy, modules[0], modified); err != nil {
-			return err
+		report("NEGATIVE_METADATA", m.name, "PASS every missing inventory file rejected")
+		for _, kind := range []string{"extra", "nested", "symlink"} {
+			name := "unexpected.txt"
+			if kind == "nested" {
+				name = "nested/go.mod"
+			}
+			filename := filepath.Join(dir, filepath.FromSlash(name))
+			if kind == "symlink" {
+				if err := os.Symlink("README.md", filename); err != nil {
+					return err
+				}
+			} else if err := writeFiles(dir, map[string][]byte{name: []byte("unexpected\n")}); err != nil {
+				return err
+			}
+			detected := checkSource(clone)
+			if err := os.Remove(filename); err != nil {
+				return err
+			}
+			if kind == "nested" {
+				if err := os.Remove(filepath.Dir(filename)); err != nil {
+					return err
+				}
+			}
+			if detected == nil || !strings.Contains(detected.Error(), "SOURCE_INVENTORY") {
+				return fmt.Errorf("NEGATIVE_METADATA: %s %s not rejected: %v", m.name, kind, detected)
+			}
+			report("NEGATIVE_METADATA", m.name+"-"+kind, "PASS expected SOURCE_INVENTORY rejection")
 		}
-		detected := checkZip(proxy, modules[0], inventories["rc013v1"])
-		if detected == nil || !strings.Contains(detected.Error(), "ZIP_CONTENTS") {
-			return fmt.Errorf("NEGATIVE_METADATA: ZIP %s mutation was not rejected: %v", name, detected)
+		for _, name := range []string{"LICENSE", "internal/bitio/bitio.go", "README.md"} {
+			modified := make(map[string][]byte)
+			for file, data := range inventories[m.name] {
+				modified[file] = data
+			}
+			modified[name] = []byte("damaged temporary ZIP entry\n")
+			proxy := filepath.Join(temp, "mutation-proxy", m.name)
+			if err := writeProxy(proxy, m, modified); err != nil {
+				return err
+			}
+			detected := checkZip(proxy, m, inventories[m.name])
+			if detected == nil || !strings.Contains(detected.Error(), "ZIP_CONTENTS") {
+				return fmt.Errorf("NEGATIVE_METADATA: ZIP %s/%s mutation not rejected: %v", m.name, name, detected)
+			}
+			report("NEGATIVE_METADATA", m.name+"/"+name, "PASS expected ZIP_CONTENTS rejection")
 		}
-		report("NEGATIVE_METADATA", name, "PASS expected ZIP_CONTENTS rejection")
 	}
-
 	return nil
 }

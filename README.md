@@ -8,25 +8,26 @@ ITS FORUM の公開RC規格をGoの型として読み書きするライブラリ
 |---|---|---|
 | [`github.com/hareku/its-forum-go/rc013v1`](rc013v1/README.md) | `rc013` | RC-013 **1.1**：単独メッセージ、共通DF、任意・自由領域 |
 | [`github.com/hareku/its-forum-go/rc016v1`](rc016v1/README.md) | `rc016` | RC-016 **1.0**：自転車・歩行者、通常路側機、CSMA型路側機の全3系統 |
+| [`github.com/hareku/its-forum-go/rc016v2`](rc016v2/README.md) | `rc016` | RC-016 **2.0**：自転車・歩行者の完全な個別アプリpayload |
 
-名前の `v1` は規格majorを表します。対応は上記の完全な規格版に限り、同じmajorの全minor版への対応を意味しません。Go APIのリリース番号、wire上の `Header.Version` とは独立です。RC-016規格major 2や他のRCの実装は含みません。
+名前の `v1` / `v2` は規格majorを表します。対応は上記の完全な規格版に限り、同じmajorの全minor版への対応を意味しません。Go APIのリリース番号、wire上の `Header.Version` とは独立です。RC-019や他のRCの実装は含みません。
 
 利用例、API、未知データの保持・編集契約、規格上の留保は、上表の各モジュールの利用ガイドを参照してください。
 
 ## 開発と公開前の検証
 
-ルートはGoモジュールではなく、[go.work](go.work)で2つのモジュールを同時開発します。リポジトリのルートで、Go 1.27.0を用意して次を実行してください。
+ルートはGoモジュールではなく、[go.work](go.work)で3つのモジュールを同時開発します。リポジトリのルートで、Go 1.27.0を用意して次を実行してください。
 
 ```sh
 set -eu
 go version
-format_output=$(gofmt -l rc013v1 rc016v1 scripts)
+format_output=$(gofmt -l rc013v1 rc016v1 rc016v2 scripts)
 if [ -n "$format_output" ]; then
     printf '%s\n' "$format_output"
     exit 1
 fi
-GOPROXY=off go test -count=1 ./rc013v1/... ./rc016v1/...
-GOPROXY=off go vet ./rc013v1/... ./rc016v1/...
+GOPROXY=off go test -count=1 ./rc013v1/... ./rc016v1/... ./rc016v2/...
+GOPROXY=off go vet ./rc013v1/... ./rc016v1/... ./rc016v2/...
 GOWORK=off go run ./scripts/verify-modules.go
 ```
 

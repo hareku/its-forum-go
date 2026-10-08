@@ -21,14 +21,14 @@ jobs:
       - name: Format
         shell: bash
         run: |
-          format_output=$(gofmt -l rc013v1 rc016v1 scripts)
+          format_output=$(gofmt -l rc013v1 rc016v1 rc016v2 scripts)
           if [ -n "$format_output" ]; then
             printf '%s\n' "$format_output"
             exit 1
           fi
       - name: Workspace tests
-        run: GOPROXY=off go test -count=1 ./rc013v1/... ./rc016v1/...
+        run: GOPROXY=off go test -count=1 ./rc013v1/... ./rc016v1/... ./rc016v2/...
       - name: Workspace vet
-        run: GOPROXY=off go vet ./rc013v1/... ./rc016v1/...
+        run: GOPROXY=off go vet ./rc013v1/... ./rc016v1/... ./rc016v2/...
       - name: Independent modules and consumers
         run: GOWORK=off go run ./scripts/verify-modules.go

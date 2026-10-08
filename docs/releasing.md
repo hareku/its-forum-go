@@ -9,26 +9,28 @@
 | RC-013 1.1 | `github.com/hareku/its-forum-go/rc013v1` | 初回予定 `v0.1.0` | `rc013v1/v0.1.0` |
 | RC-016 1.0 | `github.com/hareku/its-forum-go/rc016v1` | 初回予定 `v0.1.0` | `rc016v1/v0.1.0` |
 | 将来、規格major 1のままGo API major 2 | `github.com/hareku/its-forum-go/rc016v1/v2` | `v2.0.0` | `rc016v1/v2.0.0` |
-| 将来、RC-016規格major 2を実装 | `github.com/hareku/its-forum-go/rc016v2` | 独立したGo API版 | `rc016v2/v0.1.0` など |
+| RC-016 2.0 | `github.com/hareku/its-forum-go/rc016v2` | 初回予定 `v0.1.0` | `rc016v2/v0.1.0` |
 
-下2行は将来の命名方針で、実装済みモジュールではありません。規格major、対応する完全な規格版、Go API SemVer、wire上の `Header.Version` はそれぞれ独立です。`rc016v1` は同じ規格majorの全minor版対応を意味しません。末尾のGo API major suffixはmajor 2から付けます。Go API major 2のtagに余分な `/v2/` を挿入しません。
+Go API major 2の行は将来の命名方針で、実装済みモジュールではありません。規格major、対応する完全な規格版、Go API SemVer、wire上の `Header.Version` はそれぞれ独立です。`rc016v1` は同じ規格majorの全minor版対応を意味しません。末尾のGo API major suffixはmajor 2から付けます。Go API major 2のtagに余分な `/v2/` を挿入しません。
 
 各 `go.mod` は自分自身のリリース番号を宣言せず、Git tagがその版を識別します。RC-013とRC-016は独立に版を上げられます。公開済みのtagの付け替えや、同じ版への内容差し替えは行わず、新しい版を発行してください。
 
 ## 公開前の候補検証
 
-リポジトリのルートで[READMEのローカル検証](../README.md#開発と公開前の検証)をすべて実行します。workspaceのtest／vetは `GOPROXY=off go test -count=1 ./rc013v1/... ./rc016v1/...` と `GOPROXY=off go vet ./rc013v1/... ./rc016v1/...` で実行し、未公開依存のメタデータ取得を避けます。`GOWORK=off go run ./scripts/verify-modules.go` の独立検証も必要で、runnerは自身の一時file proxyを設定します。このオフライン指定は候補のworkspace検証だけに適用し、以下の実公開取得には適用しません。
+リポジトリのルートで[READMEのローカル検証](../README.md#開発と公開前の検証)をすべて実行します。workspaceのtest／vetは `GOPROXY=off go test -count=1 ./rc013v1/... ./rc016v1/... ./rc016v2/...` と `GOPROXY=off go vet ./rc013v1/... ./rc016v1/... ./rc016v2/...` で実行し、未公開依存のメタデータ取得を避けます。`GOWORK=off go run ./scripts/verify-modules.go` の独立検証も必要で、runnerは自身の一時file proxyを設定します。このオフライン指定は候補のworkspace検証だけに適用し、以下の実公開取得には適用しません。
 
 runnerは候補ソースのZIPを一時file proxyに作り、独立stage・外部consumer・空cacheで検査します。このZIP、checksum、cacheを本番へ流用しないでください。候補のファイル名・内容が実際の公開ZIPと異なればchecksumも異なります。`GOSUMDB=off` は既存checksumとの不一致を無視する設定ではありません。
 
-製品の `go.mod` にlocal `replace` がないこと、公開物に私有資料や検証用一時ファイルが混ざらないこと、両モジュールのLICENSEが[ルートのMIT本文](../LICENSE)と完全一致することを確認します。ルートと同じLICENSEを各モジュール内へ明示コピーする方針であり、GoのルートLICENSE自動継承の実証に依存しません。将来の本物の `go.sum` は管理対象です。
+製品の `go.mod` にlocal `replace` がないこと、公開物に私有資料や検証用一時ファイルが混ざらないこと、全3モジュールのLICENSEが[ルートのMIT本文](../LICENSE)と完全一致することを確認します。ルートと同じLICENSEを各モジュール内へ明示コピーする方針であり、GoのルートLICENSE自動継承の実証に依存しません。将来の本物の `go.sum` は管理対象です。
 
 ## 初回公開の順序
 
 1. RC-013を先に確定し、将来の公開作業で `rc013v1/v0.1.0` tagを公開します。下記の公開consumer検証をRC-013に実行し、公開proxyとsumdbを通じて取得できることを確認します。
-2. RC-013取得に成功した後、下記のRC-016依存確定を実行します。RC-016のrequireが実公開されたRC-013 `v0.1.0` であることを確認し、実公開ZIP由来の `rc016v1/go.sum` を生成します。公開前のRC-016候補にもconsumer fixtureを適用します。取得できない場合はRC-016の公開へ進みません。
-3. test/vetに成功したRC-016のrequireと本物のgo.sumを別のリリースcommitに含め、その後に `rc016v1/v0.1.0` tagを公開します。両tagが同じcommitを指す必要はありません。
-4. RC-016にも下記の公開consumer検証を実行します。RC-013の推移的依存、型の同一性、3系統の操作、配布LICENSEを確認して公開後の検証を完了します。
+2. RC-013取得に成功した後、下記のRC-016依存確定を実行します。RC-016のrequireが実公開されたRC-013 `v0.1.0` であることを確認し、対象モジュールに実公開ZIP由来の `go.sum` を生成します。公開前のRC-016候補にもconsumer fixtureを適用します。取得できない場合はRC-016の公開へ進みません。
+3. test/vetに成功したRC-016のrequireと本物のgo.sumを別のリリースcommitに含め、その後に `rc016v1/v0.1.0` または `rc016v2/v0.1.0` tagを公開します。各tagが同じcommitを指す必要はありません。
+4. RC-016にも下記の公開consumer検証を実行します。RC-013の推移的依存、型の同一性、v1の3系統またはv2の自転車・歩行者の操作、配布LICENSEを確認して公開後の検証を完了します。
+
+v1とv2はどちらもRC-013を直接依存とし、相互の公開順序に制約はありません。各規格モジュールのGo API SemVerも独立です。
 
 将来のRC-016更新も、workspaceの兄弟ソースだけではなく実公開されたrequire版で検証します。新しいRC-013 APIが必要ならRC-013を先に公開し、その後RC-016のrequireを明示更新してください。
 
@@ -79,7 +81,7 @@ import zipfile
 repo, selected, graph_file = sys.argv[1:]
 base = 'github.com/hareku/its-forum-go/'
 expected = {base + 'rc013v1': 'v0.1.0'}
-if selected == 'rc016v1':
+if selected in ('rc016v1', 'rc016v2'):
     expected[base + selected] = 'v0.1.0'
 raw = Path(graph_file).read_text()
 decoder = json.JSONDecoder()
@@ -126,18 +128,25 @@ RC-016のtag公開後、別の空cache・一時directoryで実行します。
 
 ```bash
 public_consumer rc016v1 consumer-rc016
+public_consumer rc016v2 consumer-rc016v2
 ```
 
 RC-016用fixtureはRC-013も直接importするため、初回の依存解決ではRC-013のdirect require追加を許容します。その後はreadonly検証と正確なgraph検査を行います。各ZIPのLICENSEは作業中のソースではなく、取得した版のGit tagにあるルート・モジュールLICENSEと照合します。tagを作成しただけでは取得検証の成功とは扱いません。
 
 ## RC-016の依存確定（RC-013公開後、RC-016公開前のみ）
 
-次はリポジトリのルートで実行します。この工程だけはリリース対象の `rc016v1/go.mod` / `go.sum` を更新します。Go 1.27.0を用い、RC-013公開consumer検証の成功後に進んでください。
+次はリポジトリのルートで実行します。この工程だけはリリース対象の `rc016v1` または `rc016v2` の `go.mod` / `go.sum` を更新します。Go 1.27.0を用い、RC-013公開consumer検証の成功後に進んでください。
 
 ```bash
 (
     set -euo pipefail
     release_repo_dir=$(pwd -P)
+    release_module=rc016v2 # Set rc016v1 for the RC-016 1.0 release.
+    case "$release_module" in
+        rc016v1) release_fixture=consumer-rc016 ;;
+        rc016v2) release_fixture=consumer-rc016v2 ;;
+        *) exit 1 ;;
+    esac
     release_temp=$(mktemp -d)
     trap '
         release_status=$?
@@ -152,13 +161,13 @@ RC-016用fixtureはRC-013も直接importするため、初回の依存解決で�
     export GOPRIVATE= GONOPROXY= GONOSUMDB=
     export GOPATH="$release_temp/gopath" GOMODCACHE="$release_temp/modcache"
     export GOCACHE="$release_temp/buildcache"
-    cd rc016v1
+    cd "$release_module"
     go mod edit -json > "$release_temp/module.json"
-    python3 - "$release_temp/module.json" <<'PY'
+    python3 - "$release_temp/module.json" "$release_module" <<'PY'
 import json
 import sys
 m = json.load(open(sys.argv[1]))
-assert m['Module']['Path'] == 'github.com/hareku/its-forum-go/rc016v1'
+assert m['Module']['Path'] == 'github.com/hareku/its-forum-go/' + sys.argv[2]
 assert not m.get('Replace')
 assert [(r['Path'], r['Version']) for r in m['Require']] == [
     ('github.com/hareku/its-forum-go/rc013v1', 'v0.1.0')
@@ -168,7 +177,7 @@ PY
     go test -mod=readonly -count=1 ./...
     go vet -mod=readonly ./...
     go test -mod=readonly -count=1 \
-        "$release_repo_dir/scripts/testdata/consumer-rc016/consumer_test.go"
+        "$release_repo_dir/scripts/testdata/$release_fixture/consumer_test.go"
     go mod verify
     go list -mod=readonly -m -json all
 )
