@@ -1,0 +1,5 @@
+# Independent personal and CSMA fixtures
+
+`bicycle.hex`: RC-016 1.0 §§3.2–3.2.2.3, printed pp10–21 and RC-013 1.1 common frames. Fixture-only IDs90/91/92/93 map common/basic/extended/pedestrian. Header8+common28+free header13+payload27=76. Free offsets0/5/8/22, lengths5/3/14/5. Personal common5/delay3/watch01020304=a301020304. Basic2/3/2/1/16/5=239105. Extended all width maxima gives14ff. Pedestrian3/1/2/reserved15555=0c00195555. Complete independent expected common values are in bicycle_test.go. Source arithmetic and second-author review are in private planning artifacts; no production helper generated this fixture.
+
+`csma.hex`: RC-016 1.0 tables4-10 and4-12, printed pp41–45. Header20+object16=36. Header5/1/1/42,1234,01020304,a0b0c0d0, correction1/hour12/minute34/millisecond56789, size16,reservedbeef. Object7/latitude-350000000/longitude1390000000/speed1234/heading7200/acceleration-123/type4/size2. Signed values use two's complement. CSMA 0/5-object literals in tests derive solely from these fixed literals and independent length arithmetic.
