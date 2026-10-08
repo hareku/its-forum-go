@@ -1,5 +1,5 @@
-// Command verify-modules checks the three unpublished module candidates using an
-// isolated file proxy. Its synthetic checksums are never copied into source.
+// Command verify-modules checks the three module candidates using an isolated
+// file proxy. Its synthetic checksums are never copied into source.
 // Run from the repository root: GOWORK=off go run ./scripts/verify-modules.go.
 package main
 

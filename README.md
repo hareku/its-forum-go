@@ -2,13 +2,13 @@
 
 ITS FORUM の公開RC規格をGoの型として読み書きするライブラリ群です。Go 1.27.0以降を使用します。第三者Goライブラリへの依存はなく、RC-016モジュールは同じリポジトリのRC-013モジュールに依存します。
 
-リポジトリは `github.com/hareku/its-forum-go` です。**各モジュールの初回予定のバージョン付きリリース `v0.1.0` は未公開です。** 公開proxyからのバージョン指定取得は未検証です。
+リポジトリは `github.com/hareku/its-forum-go` です。各モジュールの初回リリース `v0.1.0` を公開しています。空cacheから公開proxy・sumdbを通じたバージョン指定取得と、外部consumerのtest／vet・依存graph・配布LICENSEを検証済みです。
 
-| モジュールパス・利用ガイド | package名 | 対応する規格と範囲 |
-|---|---|---|
-| [`github.com/hareku/its-forum-go/rc013v1`](rc013v1/README.md) | `rc013` | RC-013 **1.1**：単独メッセージ、共通DF、任意・自由領域 |
-| [`github.com/hareku/its-forum-go/rc016v1`](rc016v1/README.md) | `rc016` | RC-016 **1.0**：自転車・歩行者、通常路側機、CSMA型路側機の全3系統 |
-| [`github.com/hareku/its-forum-go/rc016v2`](rc016v2/README.md) | `rc016` | RC-016 **2.0**：自転車・歩行者の完全な個別アプリpayload |
+| モジュールパス・利用ガイド | package名 | 対応する規格と範囲 | リリース |
+|---|---|---|---|
+| [`github.com/hareku/its-forum-go/rc013v1`](rc013v1/README.md) | `rc013` | RC-013 **1.1**：単独メッセージ、共通DF、任意・自由領域 | [v0.1.0](https://github.com/hareku/its-forum-go/releases/tag/rc013v1/v0.1.0) |
+| [`github.com/hareku/its-forum-go/rc016v1`](rc016v1/README.md) | `rc016` | RC-016 **1.0**：自転車・歩行者、通常路側機、CSMA型路側機の全3系統 | [v0.1.0](https://github.com/hareku/its-forum-go/releases/tag/rc016v1/v0.1.0) |
+| [`github.com/hareku/its-forum-go/rc016v2`](rc016v2/README.md) | `rc016` | RC-016 **2.0**：自転車・歩行者の完全な個別アプリpayload | [v0.1.0](https://github.com/hareku/its-forum-go/releases/tag/rc016v2/v0.1.0) |
 
 名前の `v1` / `v2` は規格majorを表します。対応は上記の完全な規格版に限り、同じmajorの全minor版への対応を意味しません。Go APIのリリース番号、wire上の `Header.Version` とは独立です。RC-019や他のRCの実装は含みません。
 
@@ -31,9 +31,9 @@ GOPROXY=off go vet ./rc013v1/... ./rc016v1/... ./rc016v2/...
 GOWORK=off go run ./scripts/verify-modules.go
 ```
 
-workspaceのtest／vetにはコマンド単位で `GOPROXY=off` を指定し、未公開の兄弟モジュールのメタデータ取得を避けます。独立検証runnerは別途、自身の一時file proxyを設定します。
+workspaceのtest／vetにはコマンド単位で `GOPROXY=off` を指定し、兄弟モジュールのメタデータを公開サービスから取得することを避けます。独立検証runnerは別途、自身の一時file proxyを設定します。
 
-[検証runner](scripts/verify-modules.go)は候補ソースの配布ZIP、workspace外の各モジュール・外部consumer、依存graph、LICENSE、期待した失敗を空cacheと一時file proxyで検査します。公開サービスへの問い合わせは不要です。RC-013未公開時のRC-016独立検証にもこのrunnerを使います。
+[検証runner](scripts/verify-modules.go)は候補ソースの配布ZIP、workspace外の各モジュール・外部consumer、依存graph、LICENSE、期待した失敗を空cacheと一時file proxyで検査します。公開サービスへの問い合わせは不要で、未公開の依存候補を含むRC-016の独立検証にも使えます。
 
 これは実公開取得の証明ではありません。一時proxy・cache・checksumは隔離し、製品の `go.sum` へ転用しません。実公開版からのchecksum生成は[リリース手順](docs/releasing.md)に従います。
 

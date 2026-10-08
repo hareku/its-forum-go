@@ -1,15 +1,17 @@
 # モジュールのリリース
 
-各モジュールの初回予定のバージョン付きリリース `v0.1.0` は未公開です。この文書はタグを付けてリリースする際の手順です。以下の公開proxy・sumdb検証は、モジュールのタグ公開に合わせて実施します。
+全3モジュールの初回リリース `v0.1.0` は2026年10月8日に公開済みです。各モジュールで、以下の公開consumer検証による公開proxy・sumdb経由の取得、test／vet、依存graph、配布LICENSEの確認に成功しました。GitHub Releaseへのリンクは[ルートREADME](../README.md)を参照してください。
+
+以下は初回公開で使用した手順と再検証用のスクリプトです。次回公開では対象のバージョンに合わせてタグ・require・検証スクリプトを更新し、同じ候補検証・公開取得検証を行います。
 
 ## 規格版とGo API版
 
 | 対象 | module path | Go API版の例 | Git tag |
 |---|---|---|---|
-| RC-013 1.1 | `github.com/hareku/its-forum-go/rc013v1` | 初回予定 `v0.1.0` | `rc013v1/v0.1.0` |
-| RC-016 1.0 | `github.com/hareku/its-forum-go/rc016v1` | 初回予定 `v0.1.0` | `rc016v1/v0.1.0` |
+| RC-013 1.1 | `github.com/hareku/its-forum-go/rc013v1` | 初回 `v0.1.0` | `rc013v1/v0.1.0` |
+| RC-016 1.0 | `github.com/hareku/its-forum-go/rc016v1` | 初回 `v0.1.0` | `rc016v1/v0.1.0` |
 | 将来、規格major 1のままGo API major 2 | `github.com/hareku/its-forum-go/rc016v1/v2` | `v2.0.0` | `rc016v1/v2.0.0` |
-| RC-016 2.0 | `github.com/hareku/its-forum-go/rc016v2` | 初回予定 `v0.1.0` | `rc016v2/v0.1.0` |
+| RC-016 2.0 | `github.com/hareku/its-forum-go/rc016v2` | 初回 `v0.1.0` | `rc016v2/v0.1.0` |
 
 Go API major 2の行は将来の命名方針で、実装済みモジュールではありません。規格major、対応する完全な規格版、Go API SemVer、wire上の `Header.Version` はそれぞれ独立です。`rc016v1` は同じ規格majorの全minor版対応を意味しません。末尾のGo API major suffixはmajor 2から付けます。Go API major 2のtagに余分な `/v2/` を挿入しません。
 
@@ -17,18 +19,18 @@ Go API major 2の行は将来の命名方針で、実装済みモジュールで
 
 ## 公開前の候補検証
 
-リポジトリのルートで[READMEのローカル検証](../README.md#開発と公開前の検証)をすべて実行します。workspaceのtest／vetは `GOPROXY=off go test -count=1 ./rc013v1/... ./rc016v1/... ./rc016v2/...` と `GOPROXY=off go vet ./rc013v1/... ./rc016v1/... ./rc016v2/...` で実行し、未公開依存のメタデータ取得を避けます。`GOWORK=off go run ./scripts/verify-modules.go` の独立検証も必要で、runnerは自身の一時file proxyを設定します。このオフライン指定は候補のworkspace検証だけに適用し、以下の実公開取得には適用しません。
+リポジトリのルートで[READMEのローカル検証](../README.md#開発と公開前の検証)をすべて実行します。workspaceのtest／vetは `GOPROXY=off go test -count=1 ./rc013v1/... ./rc016v1/... ./rc016v2/...` と `GOPROXY=off go vet ./rc013v1/... ./rc016v1/... ./rc016v2/...` で実行し、依存メタデータを公開サービスから取得することを避けます。`GOWORK=off go run ./scripts/verify-modules.go` の独立検証も必要で、runnerは自身の一時file proxyを設定します。このオフライン指定は候補のworkspace検証だけに適用し、以下の実公開取得には適用しません。
 
 runnerは候補ソースのZIPを一時file proxyに作り、独立stage・外部consumer・空cacheで検査します。このZIP、checksum、cacheを本番へ流用しないでください。候補のファイル名・内容が実際の公開ZIPと異なればchecksumも異なります。`GOSUMDB=off` は既存checksumとの不一致を無視する設定ではありません。
 
-製品の `go.mod` にlocal `replace` がないこと、公開物に私有資料や検証用一時ファイルが混ざらないこと、全3モジュールのLICENSEが[ルートのMIT本文](../LICENSE)と完全一致することを確認します。ルートと同じLICENSEを各モジュール内へ明示コピーする方針であり、GoのルートLICENSE自動継承の実証に依存しません。将来の本物の `go.sum` は管理対象です。
+製品の `go.mod` にlocal `replace` がないこと、公開物に私有資料や検証用一時ファイルが混ざらないこと、全3モジュールのLICENSEが[ルートのMIT本文](../LICENSE)と完全一致することを確認します。ルートと同じLICENSEを各モジュール内へ明示コピーする方針であり、GoのルートLICENSE自動継承の実証に依存しません。RC-016の実公開版由来の `go.sum` は管理対象です。
 
-## 初回公開の順序
+## 初回公開で実施した順序
 
-1. RC-013を先に確定し、将来の公開作業で `rc013v1/v0.1.0` tagを公開します。下記の公開consumer検証をRC-013に実行し、公開proxyとsumdbを通じて取得できることを確認します。
-2. RC-013取得に成功した後、下記のRC-016依存確定を実行します。RC-016のrequireが実公開されたRC-013 `v0.1.0` であることを確認し、対象モジュールに実公開ZIP由来の `go.sum` を生成します。公開前のRC-016候補にもconsumer fixtureを適用します。取得できない場合はRC-016の公開へ進みません。
-3. test/vetに成功したRC-016のrequireと本物のgo.sumを別のリリースcommitに含め、その後に `rc016v1/v0.1.0` または `rc016v2/v0.1.0` tagを公開します。各tagが同じcommitを指す必要はありません。
-4. RC-016にも下記の公開consumer検証を実行します。RC-013の推移的依存、型の同一性、v1の3系統またはv2の自転車・歩行者の操作、配布LICENSEを確認して公開後の検証を完了します。
+1. RC-013を先に確定し、`rc013v1/v0.1.0` tagを公開しました。下記の公開consumer検証をRC-013に実行し、公開proxyとsumdbを通じて取得できることを確認しました。
+2. RC-013取得に成功した後、下記のRC-016依存確定を両モジュールに実行しました。requireが実公開されたRC-013 `v0.1.0` であることを確認し、実公開ZIP由来の `go.sum` を生成しました。公開前のRC-016候補にもconsumer fixtureを適用しました。取得できない場合はRC-016の公開へ進まない方針です。
+3. test/vetに成功したRC-016のrequireと本物のgo.sumを別のリリースcommitに含め、そのcommitに `rc016v1/v0.1.0` と `rc016v2/v0.1.0` tagを付けて公開しました。RC-013と同じcommitを指す必要はありません。
+4. 各RC-016にも下記の公開consumer検証を実行しました。RC-013の推移的依存、型の同一性、v1の3系統とv2の自転車・歩行者の操作、配布LICENSEを確認し、全3モジュールのGitHub Releaseを公開しました。
 
 v1とv2はどちらもRC-013を直接依存とし、相互の公開順序に制約はありません。各規格モジュールのGo API SemVerも独立です。
 
